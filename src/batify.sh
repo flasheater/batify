@@ -20,72 +20,52 @@
 # COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
-xlog="/tmp/batify.log"
-DEBUG=1
-
-[ "$DEBUG" = "1" ] && echo > $xlog
-
 xtty=$(cat /sys/class/tty/tty0/active)
-
-if [ -z "${xtty}" ]; then
-    [ "$DEBUG" = "1" ] && echo "no tty found." >> $xlog
-    exit 1
-fi
-
-[ "$DEBUG" = "1" ] && echo "XTTY=${xtty}" >> $xlog
-
 xuser=$(who | grep ${xtty}  | head -n1 | cut -d' ' -f1)
 
 if [ -z "${xuser}" ]; then
-    [ "$DEBUG" = "1" ] && echo "no user found." >> $xlog
+    echo "No user found from ${xtty}."
     exit 1
 fi
 
-[ "$DEBUG" = "1" ] && echo "XUSER=${xuser}" >> $xlog
+xdisplay=$(ps --no-headers -o command -p $(pgrep Xorg) | \
+    grep "vt$(echo $xtty | grep -o "[0-9]")" | \
+    grep -o ":[0-9]" | head -n 1)
 
-# Looking for current DISPLAY
+if [ -z "${xdisplay}" ]; then
+    echo "No X process found from ${xtty}."
+    exit 1
+fi
+
 for pid in $(ps -u ${xuser} -o pid --no-headers); do
     env="/proc/${pid}/environ"
-    [ ! -f "${env}" ] || [ ! -r "${env}" ] && continue
+    if [ ! -f "${env}" ] || [ ! -r "${env}" ]; then
+        continue
+    fi
     display=$(grep -z "^DISPLAY=" ${env} | tr -d '\0' | cut -d '=' -f 2)
     if [ -n "${display}" ]; then
-        dbus=$(grep -z DBUS_SESSION_BUS_ADDRESS $env | tr -d '\0' | \
+        if [ "${display}" != "${xdisplay}" ]; then
+            continue
+        fi
+        dbus=$(grep -z "DBUS_SESSION_BUS_ADDRESS=" $env | tr -d '\0' | \
             sed 's/DBUS_SESSION_BUS_ADDRESS=//g')
         if [ -n $dbus ]; then
-            [ "$DEBUG" = "1" ] && echo "[$(ps --pid $pid -o comm --no-headers)]: pid=${pid};DISPLAY=${display};dbus=${dbus}" >> $xlog
-	    xauth=$(grep -z "XAUTHORITY=" $env | tr -d '\0' | sed 's/XAUTHORITY=//g')
+            xauth=$(grep -z "XAUTHORITY=" $env | tr -d '\0' | sed 's/XAUTHORITY=//g')
             break
-        else
-            [ "$DEBUG" = "1" ] && echo "[$(ps --pid $pid -o comm --no-headers)]: pid=${pid};DISPLAY=${display};" >> $xlog
         fi
     fi
 done
 
-if [ -z "${display}" ]; then
-    [ "$DEBUG" = "1" ] && echo "No display found." >> $xlog
-    exit 1
-fi
-
-[ "$DEBUG" = "1" ] && echo "DISPLAY=${display}" >> $xlog
-
-if [ -z "${dbus}" ]; then
-    [ "$DEBUG" = "1" ] && echo "No dbus-daemon process found on the X display." >> $xlog
-    exit 1
-fi
-
-[ "$DEBUG" = "1" ] && echo "DBUS_SESSION_BUS_ADDRESS=${dbus}" >> $xlog
-
-if [ -z "${xauth}" ]; then
-    [ "$DEBUG" = "1" ] && echo "No Xauthority found." >> $xlog
-    exit 1
-fi
-
-[ "$DEBUG" = "1" ] && echo "XAUTHORITY=${xauth}" >> $xlog
+[ -z "${dbus}" ]    && echo "No session bus address found."     && exit 1
+[ -z "${xauth}" ]   && echo "No Xauthority found."              && exit 1
 
 _udev_params=( "$@" )
 _bat_name="${_udev_params[0]}"
 _bat_capacity="${_udev_params[1]}"
 _bat_plug="${_udev_params[2]}"
+
+icon_dir="/usr/share/icons/batify"
+icon_path="${icon_dir}/${icon}.png"
 
 if [ "${_bat_plug}" != "none" ]; then
 	if [ "${_bat_plug}" == "1" ]; then
@@ -104,17 +84,11 @@ else
 	ntf_msg="[${_bat_name}] - Battery: ${_bat_capacity}%"
 fi
 
-icon_dir="/usr/share/icons/batify"
-icon_path="${icon_dir}/${icon}.png"
+[ -f /usr/bin/su ]  && su_path="/usr/bin/su"
+[ -f /bin/su ]      && su_path="/bin/su" || su_path=
 
-[ -f /usr/bin/su ] && su_path="/usr/bin/su"
-[ -f /bin/su ] && su_path="/bin/su" || su_path=
+[ -z "$su_path" ]   && echo "'su' command not found." && exit 1
 
-if [ -z su_path ]; then
-    [ "$DEBUG" = "1" ] && echo "'su' command not found." >> $xlog
-    exit 1  
-fi
-
-DBUS_SESSION_BUS_ADDRESS=$dbus DISPLAY=$display XAUTHORITY=$xauth \
+DBUS_SESSION_BUS_ADDRESS=$dbus DISPLAY=$xdisplay XAUTHORITY=$xauth \
 ${su_path} ${xuser} -c \
 "/usr/bin/notify-send --hint=int:transient:1 -u ${ntf_lvl} -i \"${icon_path}\" \"${ntf_msg}\""
