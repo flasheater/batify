@@ -64,12 +64,3 @@ There are basic icons with batify but you can obviously use yours.
 * Edit `/usr/local/bin/batify.sh`
 * Set `icon_dir` variable
 * Use `icon` as you please
-
-# FAQ
-
-* Mysteriously, it does not work:
-
-Check on `DBUS_SESSION_BUS_ADDRESS` variable in `/usr/local/bin/batify.sh`
-Batify can not find the existing bus address on the X display or in a file in
-~/.dbus/session-bus/ to send a X message bus from a shell script.
-
