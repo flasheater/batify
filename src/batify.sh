@@ -28,8 +28,7 @@ if [ -z "${xuser}" ]; then
     exit 1
 fi
 
-xdisplay=$(ps --no-headers -o command -p $(pgrep Xorg) | \
-    grep "vt$(echo $xtty | grep -o "[0-9]")" | \
+xdisplay=$(ps -o command -p $(pgrep Xorg) | grep " vt${xtty:3:${#tty}}" | \
     grep -o ":[0-9]" | head -n 1)
 
 if [ -z "${xdisplay}" ]; then
@@ -47,17 +46,22 @@ for pid in $(ps -u ${xuser} -o pid --no-headers); do
         if [ "${display}" != "${xdisplay}" ]; then
             continue
         fi
-        dbus=$(grep -z "DBUS_SESSION_BUS_ADDRESS=" $env | tr -d '\0' | \
+        dbus=$(grep -z "DBUS_SESSION_BUS_ADDRESS=" ${env} | tr -d '\0' | \
             sed 's/DBUS_SESSION_BUS_ADDRESS=//g')
-        if [ -n $dbus ]; then
-            xauth=$(grep -z "XAUTHORITY=" $env | tr -d '\0' | sed 's/XAUTHORITY=//g')
+        if [ -n ${dbus} ]; then
+            xauth=$(grep -z "XAUTHORITY=" ${env} | tr -d '\0' | sed 's/XAUTHORITY=//g')
             break
         fi
     fi
 done
 
-[ -z "${dbus}" ]    && echo "No session bus address found."     && exit 1
-[ -z "${xauth}" ]   && echo "No Xauthority found."              && exit 1
+if [ -z "${dbus}" ]; then
+    echo "No session bus address found."
+    exit 1
+elif [ -z "${xauth}" ]; then
+    echo "No Xauthority found."
+    exit 1
+fi
 
 _udev_params=( "$@" )
 _bat_name="${_udev_params[0]}"
@@ -87,8 +91,11 @@ fi
 [ -f /usr/bin/su ]  && su_path="/usr/bin/su"
 [ -f /bin/su ]      && su_path="/bin/su" || su_path=
 
-[ -z "$su_path" ]   && echo "'su' command not found." && exit 1
+if [ -z "$su_path" ]; then
+    echo "'su' command not found."
+    exit 1
+fi
 
-DBUS_SESSION_BUS_ADDRESS=$dbus DISPLAY=$xdisplay XAUTHORITY=$xauth \
+DBUS_SESSION_BUS_ADDRESS=${dbus} DISPLAY=${xdisplay} XAUTHORITY=${xauth} \
 ${su_path} ${xuser} -c \
 "/usr/bin/notify-send --hint=int:transient:1 -u ${ntf_lvl} -i \"${icon_path}\" \"${ntf_msg}\""
