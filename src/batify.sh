@@ -38,14 +38,8 @@ fi
 
 for pid in $(ps -u ${xuser} -o pid --no-headers); do
     env="/proc/${pid}/environ"
-    if [ ! -f "${env}" ] || [ ! -r "${env}" ]; then
-        continue
-    fi
     display=$(grep -z "^DISPLAY=" ${env} | tr -d '\0' | cut -d '=' -f 2)
     if [ -n "${display}" ]; then
-        if [ "${display}" != "${xdisplay}" ]; then
-            continue
-        fi
         dbus=$(grep -z "DBUS_SESSION_BUS_ADDRESS=" ${env} | tr -d '\0' | \
             sed 's/DBUS_SESSION_BUS_ADDRESS=//g')
         if [ -n ${dbus} ]; then
