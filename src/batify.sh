@@ -62,8 +62,7 @@ _bat_name="${_udev_params[0]}"
 _bat_capacity="${_udev_params[1]}"
 _bat_plug="${_udev_params[2]}"
 
-icon_dir="/usr/share/icons/batify"
-icon_path="${icon_dir}/${icon}.png"
+ICON_DIR="/usr/share/icons/batify"
 
 if [ "${_bat_plug}" != "none" ]; then
 	if [ "${_bat_plug}" == "1" ]; then
@@ -75,8 +74,8 @@ if [ "${_bat_plug}" != "none" ]; then
 	fi
 else
 	case ${_bat_capacity} in
-		[0-9])  ntf_lvl="critical"; icon="critical" ;;
-		1[0-5]) ntf_lvl="low";      icon="low"      ;;
+		[0-9])  ntf_lvl="critical"; icon="bat-critical" ;;
+		1[0-5]) ntf_lvl="low";      icon="bat-low"      ;;
 		*) exit ;;
 	esac
 	ntf_msg="[${_bat_name}] - Battery: ${_bat_capacity}%"
@@ -89,6 +88,8 @@ if [ -z "$su_path" ]; then
     echo "'su' command not found."
     exit 1
 fi
+
+icon_path="${ICON_DIR}/${icon}.png"
 
 DBUS_SESSION_BUS_ADDRESS=${dbus} DISPLAY=${xdisplay} XAUTHORITY=${xauth} \
 ${su_path} ${xuser} -c \

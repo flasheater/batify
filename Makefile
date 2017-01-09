@@ -25,7 +25,6 @@ $(UDEV):
 
 install: all
 	mkdir -p $(UDEVDIR)
-	mkdir -p $(ICONDIR)
 	mkdir -p $(BINDIR)
 	cp -r icons $(ICONDIR)/batify
 	cp $(UDEV) $(UDEVDIR)/$(UDEV)
